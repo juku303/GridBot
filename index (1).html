@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Grid Bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0c10;--surface:#111318;--card:#161a22;--border:#1e2330;--accent:#00e5a0;--accent2:#7b61ff;--red:#ff4d6a;--text:#e8eaf0;--muted:#5a6180;--mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:100}
+.logo{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:2px}
+.pair{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--surface);padding:4px 10px;border-radius:6px;border:1px solid var(--border)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;transition:background .3s}
+.dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nav{display:flex;padding:10px 20px 0;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.tab{padding:8px 16px 10px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.page{display:none;padding:16px 16px 100px;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+.pnl{background:linear-gradient(135deg,#111a14,#0d1a20);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:12px}
+.pnl-val{font-family:var(--mono);font-size:32px;font-weight:700;color:var(--accent);line-height:1;margin-bottom:4px}
+.pnl-val.neg{color:var(--red)}
+.pnl-lbl{font-size:12px;color:var(--muted)}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.sval{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px}
+.slbl{font-size:11px;color:var(--muted)}
+.ccard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:12px}
+.crow{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cinfo h3{font-size:15px;font-weight:600;margin-bottom:2px}
+.cinfo p{font-size:12px;color:var(--muted)}
+.btn-stop{background:transparent;color:var(--red);border:1px solid var(--red);border-radius:12px;padding:12px;font-family:var(--mono);font-size:13px;cursor:pointer;width:100%;margin-bottom:8px}
+.btn-start{background:var(--accent);color:#000;border:none;border-radius:12px;padding:12px;font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;width:100%}
+.live-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:4px 10px;font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:12px}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;color:var(--text);opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:200}
+.bi{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;cursor:pointer;color:var(--muted);font-size:10px;font-family:var(--mono);transition:color .2s;background:none;border:none}
+.bi.active{color:var(--accent)}
+.bic{font-size:20px;line-height:1}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo"><span class="dot" id="dot"></span>GRID BOT</div>
+  <div class="pair">ETH/USDT</div>
+</div>
+<div class="nav">
+  <button class="tab active" onclick="go('dashboard',this)">Дашборд</button>
+  <button class="tab" onclick="go('control',this)">Управление</button>
+</div>
+
+<div class="page active" id="page-dashboard">
+  <div class="live-badge" id="liveBadge">⏳ Загрузка...</div>
+  <div class="pnl">
+    <div class="pnl-lbl">Реальная прибыль с Bybit</div>
+    <div class="pnl-val" id="pnlVal">$0.00</div>
+    <div style="margin-top:8px;display:flex;gap:16px">
+      <span style="font-size:12px;color:var(--muted)">Uptime: <span style="color:var(--accent)" id="uptimeV">—</span></span>
+    </div>
+  </div>
+  <div class="sgrid">
+    <div class="scard"><div class="sval" id="sOrders">—</div><div class="slbl">Открытых ордеров</div></div>
+    <div class="scard"><div class="sval" id="sFilled">—</div><div class="slbl">Исполнено сеток</div></div>
+  </div>
+  <div class="ccard">
+    <div class="crow">
+      <div class="cinfo"><h3 id="bText">Загрузка...</h3><p id="bSub">Получаем данные с VPS</p></div>
+      <div style="font-size:28px" id="bIcon">⏳</div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Параметры</div>
+    <div style="font-size:12px;color:var(--muted);line-height:2">
+      Диапазон: <span style="color:var(--text)">$1800 — $2200</span><br>
+      Сеток: <span style="color:var(--text)">33</span> · Направление: <span style="color:var(--red)">Short</span> · Плечо: <span style="color:var(--text)">1x</span>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-control">
+  <div class="card">
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">Управление ботом</div>
+    <button class="btn-stop" onclick="stopBot()">■ ОСТАНОВИТЬ БОТА</button>
+    <button class="btn-start" onclick="startBot()">▶ ЗАПУСТИТЬ БОТА</button>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Telegram команды</div>
+    <div style="font-size:13px;color:var(--muted);line-height:2;font-family:var(--mono)">
+      <span style="color:var(--accent)">/status</span> — прибыль и статус<br>
+      <span style="color:var(--accent)">/run</span> — запустить бота<br>
+      <span style="color:var(--accent)">/stop</span> — остановить бота
+    </div>
+  </div>
+</div>
+
+<div class="bnav">
+  <button class="bi active" id="bn-dashboard" onclick="go('dashboard',null,'bn-dashboard')"><span class="bic">📊</span>ДАШБОРД</button>
+  <button class="bi" id="bn-control" onclick="go('control',null,'bn-control')"><span class="bic">⚙️</span>УПРАВЛЕНИЕ</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#0a0c10'); tg.setBackgroundColor('#0a0c10'); }
+
+const API = 'http://34.18.98.223:8080/api/status';
+
+function go(n, t, b) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.bi').forEach(x => x.classList.remove('active'));
+  document.getElementById('page-' + n).classList.add('active');
+  if (t) t.classList.add('active');
+  const bn = document.getElementById(b || 'bn-' + n);
+  if (bn) bn.classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  const ti = {dashboard: 0, control: 1};
+  if (tabs[ti[n]]) tabs[ti[n]].classList.add('active');
+}
+
+function stopBot() {
+  if (tg) tg.sendData(JSON.stringify({cmd: 'stop'}));
+  toast('⏸ Команда остановки отправлена');
+}
+
+function startBot() {
+  if (tg) tg.sendData(JSON.stringify({cmd: 'start'}));
+  toast('▶ Команда запуска отправлена');
+}
+
+async function fetchStatus() {
+  try {
+    const r = await fetch(API);
+    const d = await r.json();
+    const dot = document.getElementById('dot');
+    const badge = document.getElementById('liveBadge');
+    if (d.running) {
+      dot.className = 'dot on';
+      badge.textContent = '🟢 LIVE — реальные данные';
+      badge.style.color = 'var(--accent)';
+      document.getElementById('bText').textContent = 'Бот работает';
+      document.getElementById('bSub').textContent = 'ETH/USDT · Short · 33 сетки';
+      document.getElementById('bIcon').textContent = '🟢';
+    } else {
+      dot.className = 'dot';
+      badge.textContent = '⏸ Бот остановлен';
+      badge.style.color = 'var(--muted)';
+      document.getElementById('bText').textContent = 'Бот остановлен';
+      document.getElementById('bSub').textContent = 'Используй /run в Telegram';
+      document.getElementById('bIcon').textContent = '⏸';
+    }
+    const profit = d.profit || 0;
+    const el = document.getElementById('pnlVal');
+    el.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(2);
+    el.className = 'pnl-val' + (profit < 0 ? ' neg' : '');
+    document.getElementById('sOrders').textContent = d.openOrders || 0;
+    document.getElementById('sFilled').textContent = d.filledOrders || 0;
+    if (d.startTime) {
+      const mins = Math.floor((Date.now() - d.startTime) / 60000);
+      const h = Math.floor(mins / 60), m = mins % 60;
+      document.getElementById('uptimeV').textContent = h + 'ч ' + m + 'м';
+    }
+  } catch(e) {
+    document.getElementById('liveBadge').textContent = '❌ Нет связи с VPS';
+    document.getElementById('liveBadge').style.color = 'var(--red)';
+    document.getElementById('dot').className = 'dot';
+  }
+}
+
+function toast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+fetchStatus();
+setInterval(fetchStatus, 5000);
+</script>
+</body>
+</html>
